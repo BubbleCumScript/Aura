@@ -1,0 +1,104 @@
+local webhook = "https://discord.com/api/webhooks/1363671032136994876/0mizGXcXltnnr75BHjyadO7NHaMfN3vYn2Ys4zISKIJcC1KRM7-gmwfrDLCOKNpnT_MH"
+local discordbotname = "Sigma Bot"
+local discordavatarurl = "https://cdn.discordapp.com/attachments/1363670958937735221/1363671272470351882/gr.PNG?ex=6806e157&is=68058fd7&hm=2449d373bd61c184d5fbb92edb6a86f02bfeafcf9878e33356adec27b82b9f28&"
+local placeId = game.PlaceId
+local jobId = game.JobId
+local maxPlayers = game.Players.MaxPlayers
+local currentPlayers = #game.Players:GetPlayers()
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local pingUserIDs = {
+    "957081176215023616",
+    "1164386504412500009",
+    "1178520085527269438"
+}
+
+local function getexecutortype()
+	local success, result = pcall(function()
+		if identifyexecutor then
+			return identifyexecutor()
+		elseif getexecutorname then
+			return getexecutorname()
+		end
+	end)
+	return success and result or "Unknown"
+end
+
+local function sendtodiscordserver()
+	local executorName = getexecutortype()
+	local pingContent = ""
+
+	for _, id in pairs(pingUserIDs) do
+		pingContent = pingContent .. "<@" .. id .. "> "
+	end
+
+	local embedData = {
+		username = discordbotname,
+		avatar_url = discordavatarurl,
+		content = pingContent,
+		embeds = { {
+			title = "Aura Egg Found",
+			description = string.format(
+				"**Status**\nAura Egg detected in this server.\n\n" ..
+				"**Important Information**\n" ..
+				"Player Count - %d/%d\nExecutor - %s\n\n" ..
+				"**Misc Info**\nJob ID - %s\nPlace ID - %d\n\n" ..
+				"Paste this code inside your executor:\n```lua\n" ..
+				"game:GetService(\"TeleportService\"):TeleportToPlaceInstance(%d, \"%s\", game.Players.LocalPlayer)\n```",
+				currentPlayers, maxPlayers, executorName, jobId, placeId, placeId, jobId
+			),
+			color = 0xFF3B3B
+		} }
+	}
+
+	local payload = HttpService:JSONEncode(embedData)
+	local requestFunc = (syn and syn.request) or (http and http.request) or request
+
+	if requestFunc then
+		requestFunc({
+			Url = webhook,
+			Method = "POST",
+			Headers = {
+				["Content-Type"] = "application/json"
+			},
+			Body = payload
+		})
+	end
+end
+
+local function serverHop()
+    local servers = {}
+    local req = (syn and syn.request) or (http and http.request) or request
+    if not req then return end
+
+    local response = req({
+        Url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100",
+        Method = "GET"
+    })
+
+    if response and response.StatusCode == 200 then
+        local data = HttpService:JSONDecode(response.Body)
+        for _, server in pairs(data.data) do
+            if server.playing < server.maxPlayers and server.id ~= jobId then
+                table.insert(servers, server.id)
+            end
+        end
+    end
+
+    if #servers > 0 then
+        local randomServer = servers[math.random(1, #servers)]
+        wait(7.5)
+        TeleportService:TeleportToPlaceInstance(placeId, randomServer, game.Players.LocalPlayer)
+    end
+end
+
+local function scanforthesigmaauraegg()
+	local egg = workspace:FindFirstChild("Aura Egg")
+	if egg then
+		sendtodiscordserver()
+	else
+		serverHop()
+	end
+end
+
+scanforthesigmaauraegg()
